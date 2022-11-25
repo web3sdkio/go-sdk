@@ -1,11 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/web3sdkio/go-sdk/web3sdkio"
+	"github.com/web3sdkio/go-sdk/v2/web3sdkio"
 )
 
 var deployCmd = &cobra.Command{
@@ -31,8 +32,8 @@ var deployNftCmd = &cobra.Command{
 		}
 		defer imageFile.Close()
 
-		address, err := web3sdkioSDK.Deployer.DeployNFTCollection(&web3sdkio.DeployNFTCollectionMetadata{
-			Name: "Go SDK",
+		address, err := web3sdkioSDK.Deployer.DeployNFTCollection(context.Background(), &web3sdkio.DeployNFTCollectionMetadata{
+			Name: "Goku NFT",
 		})
 		if err != nil {
 			panic(err)
@@ -57,7 +58,7 @@ var deployEditionCmd = &cobra.Command{
 		}
 		defer imageFile.Close()
 
-		address, err := web3sdkioSDK.Deployer.DeployEdition(&web3sdkio.DeployEditionMetadata{
+		address, err := web3sdkioSDK.Deployer.DeployEdition(context.Background(), &web3sdkio.DeployEditionMetadata{
 			Name: "Go SDK",
 		})
 		if err != nil {
@@ -83,7 +84,7 @@ var deployTokenCmd = &cobra.Command{
 		}
 		defer imageFile.Close()
 
-		address, err := web3sdkioSDK.Deployer.DeployToken(&web3sdkio.DeployTokenMetadata{
+		address, err := web3sdkioSDK.Deployer.DeployToken(context.Background(), &web3sdkio.DeployTokenMetadata{
 			Name: "Go SDK",
 		})
 		if err != nil {
@@ -109,8 +110,8 @@ var deployNFTDropCmd = &cobra.Command{
 		}
 		defer imageFile.Close()
 
-		address, err := web3sdkioSDK.Deployer.DeployNFTDrop(&web3sdkio.DeployNFTDropMetadata{
-			Name: "Go SDK",
+		address, err := web3sdkioSDK.Deployer.DeployNFTDrop(context.Background(), &web3sdkio.DeployNFTDropMetadata{
+			Name: "Go Script Drop",
 		})
 		if err != nil {
 			panic(err)
@@ -135,7 +136,7 @@ var deployEditionDropCmd = &cobra.Command{
 		}
 		defer imageFile.Close()
 
-		address, err := web3sdkioSDK.Deployer.DeployEditionDrop(&web3sdkio.DeployEditionDropMetadata{
+		address, err := web3sdkioSDK.Deployer.DeployEditionDrop(context.Background(), &web3sdkio.DeployEditionDropMetadata{
 			Name: "Go SDK",
 		})
 		if err != nil {
@@ -161,7 +162,7 @@ var deployMultiwrapCmd = &cobra.Command{
 		}
 		defer imageFile.Close()
 
-		address, err := web3sdkioSDK.Deployer.DeployMultiwrap(&web3sdkio.DeployMultiwrapMetadata{
+		address, err := web3sdkioSDK.Deployer.DeployMultiwrap(context.Background(), &web3sdkio.DeployMultiwrapMetadata{
 			Name: "Go SDK",
 		})
 		if err != nil {
@@ -187,7 +188,7 @@ var deployMarketplaceCmd = &cobra.Command{
 		}
 		defer imageFile.Close()
 
-		address, err := web3sdkioSDK.Deployer.DeployMarketplace(&web3sdkio.DeployMarketplaceMetadata{
+		address, err := web3sdkioSDK.Deployer.DeployMarketplace(context.Background(), &web3sdkio.DeployMarketplaceMetadata{
 			Name: "Go SDK",
 		})
 		if err != nil {

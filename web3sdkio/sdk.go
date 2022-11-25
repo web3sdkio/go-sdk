@@ -17,7 +17,7 @@ type Web3sdkioSDK struct {
 
 // NewWeb3sdkioSDK
 //
-// Create a new instance of the Web3sdkio SDK
+// # Create a new instance of the Web3sdkio SDK
 //
 // rpcUrlOrName: the name of the chain to connection to (e.g. "rinkeby", "mumbai", "polygon", "mainnet", "fantom", "avalanche") or the RPC URL to connect to
 //
@@ -33,6 +33,10 @@ func NewWeb3sdkioSDK(rpcUrlOrChainName string, options *SDKOptions) (*Web3sdkioS
 		return nil, err
 	}
 
+	return NewWeb3sdkioSDKFromProvider(provider, options)
+}
+
+func NewWeb3sdkioSDKFromProvider(provider *ethclient.Client, options *SDKOptions) (*Web3sdkioSDK, error) {
 	// Define defaults for all the options
 	privateKey := ""
 	gatewayUrl := defaultIpfsGatewayUrl
@@ -77,7 +81,7 @@ func NewWeb3sdkioSDK(rpcUrlOrChainName string, options *SDKOptions) (*Web3sdkioS
 
 // GetNFTCollection
 //
-// Get an NFT Collection contract SDK instance
+// # Get an NFT Collection contract SDK instance
 //
 // address: the address of the NFT Collection contract
 func (sdk *Web3sdkioSDK) GetNFTCollection(address string) (*NFTCollection, error) {
@@ -91,7 +95,7 @@ func (sdk *Web3sdkioSDK) GetNFTCollection(address string) (*NFTCollection, error
 
 // GetEdition
 //
-// Get an Edition contract SDK instance
+// # Get an Edition contract SDK instance
 //
 // address: the address of the Edition contract
 func (sdk *Web3sdkioSDK) GetEdition(address string) (*Edition, error) {
@@ -105,7 +109,7 @@ func (sdk *Web3sdkioSDK) GetEdition(address string) (*Edition, error) {
 
 // GetToken
 //
-// Returns a Token contract SDK instance
+// # Returns a Token contract SDK instance
 //
 // address: address of the token contract
 //
@@ -121,7 +125,7 @@ func (sdk *Web3sdkioSDK) GetToken(address string) (*Token, error) {
 
 // GetNFTDrop
 //
-// Get an NFT Drop contract SDK instance
+// # Get an NFT Drop contract SDK instance
 //
 // address: the address of the NFT Drop contract
 func (sdk *Web3sdkioSDK) GetNFTDrop(address string) (*NFTDrop, error) {
@@ -135,7 +139,7 @@ func (sdk *Web3sdkioSDK) GetNFTDrop(address string) (*NFTDrop, error) {
 
 // GetEditionDrop
 //
-// Get an Edition Drop contract SDK instance
+// # Get an Edition Drop contract SDK instance
 //
 // address: the address of the Edition Drop contract
 func (sdk *Web3sdkioSDK) GetEditionDrop(address string) (*EditionDrop, error) {
@@ -149,7 +153,7 @@ func (sdk *Web3sdkioSDK) GetEditionDrop(address string) (*EditionDrop, error) {
 
 // GetMultiwrap
 //
-// Get a Multiwrap contract SDK instance
+// # Get a Multiwrap contract SDK instance
 //
 // address: the address of the Multiwrap contract
 func (sdk *Web3sdkioSDK) GetMultiwrap(address string) (*Multiwrap, error) {
@@ -163,7 +167,7 @@ func (sdk *Web3sdkioSDK) GetMultiwrap(address string) (*Multiwrap, error) {
 
 // GetMarketplace
 //
-// Get a Marketplace contract SDK instance
+// # Get a Marketplace contract SDK instance
 //
 // address: the address of the Marketplace contract
 func (sdk *Web3sdkioSDK) GetMarketplace(address string) (*Marketplace, error) {
@@ -177,7 +181,7 @@ func (sdk *Web3sdkioSDK) GetMarketplace(address string) (*Marketplace, error) {
 
 // GetContract
 //
-// Get an instance of a custom contract deployed with web3sdkio deploy
+// # Get an instance of a custom contract deployed with web3sdkio deploy
 //
 // address: the address of the contract
 func (sdk *Web3sdkioSDK) GetContract(address string) (*SmartContract, error) {
@@ -191,7 +195,7 @@ func (sdk *Web3sdkioSDK) GetContract(address string) (*SmartContract, error) {
 
 // GetContractFromABI
 //
-// Get an instance of ant custom contract from its ABI
+// # Get an instance of ant custom contract from its ABI
 //
 // address: the address of the contract
 //
@@ -206,22 +210,33 @@ func (sdk *Web3sdkioSDK) GetContractFromAbi(address string, abi string) (*SmartC
 	)
 }
 
+func defaultRpc(network string) (string, error) {
+	defaultApiKey := "718c5c811c7f3224efb283e04faab56a8a5cbde78d92a6d4cb905b41985d3856"
+	return fmt.Sprintf("https://%s.rpc.web3sdk.io/%s", network, defaultApiKey), nil
+}
+
 func getDefaultRpcUrl(rpcUrlorName string) (string, error) {
 	switch rpcUrlorName {
 	case "mumbai":
-		return "https://polygon-mumbai.g.alchemy.com/v2/_gg7wSSi0KMBsdKnGVfHDueq6xMB9EkC", nil
-	case "rinkeby":
-		return "https://eth-rinkeby.g.alchemy.com/v2/_gg7wSSi0KMBsdKnGVfHDueq6xMB9EkC", nil
+		return defaultRpc("mumbai")
 	case "goerli":
-		return "https://eth-goerli.g.alchemy.com/v2/_gg7wSSi0KMBsdKnGVfHDueq6xMB9EkC", nil
+		return defaultRpc("goerli")
 	case "polygon":
-		return "https://polygon-mainnet.g.alchemy.com/v2/_gg7wSSi0KMBsdKnGVfHDueq6xMB9EkC", nil
+		return defaultRpc("polygon")
 	case "mainnet", "ethereum":
-		return "https://eth-mainnet.g.alchemy.com/v2/_gg7wSSi0KMBsdKnGVfHDueq6xMB9EkC", nil
+		return defaultRpc("ethereum")
 	case "fantom":
-		return "https://rpc.ftm.tools", nil
+		return defaultRpc("fantom")
 	case "avalanche":
-		return "https://rpc.ankr.com/avalanche", nil
+		return defaultRpc("avalanche")
+	case "optimism":
+		return defaultRpc("optimism");
+	case "optimism-goerli":
+		return defaultRpc("optimism-goerli");
+	case "arbitrum":
+		return defaultRpc("arbitrum");
+	case "arbitrum-goerli":
+		return defaultRpc("arbitrum-goerli");
 	default:
 		if strings.HasPrefix(rpcUrlorName, "http") {
 			return rpcUrlorName, nil

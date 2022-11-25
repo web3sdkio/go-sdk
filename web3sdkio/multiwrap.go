@@ -1,35 +1,35 @@
 package web3sdkio
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"log"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/web3sdkio/go-sdk/internal/abi"
+	"github.com/web3sdkio/go-sdk/v2/abi"
 )
 
 // You can access the Multiwrap interface from the SDK as follows:
 //
-// 	import (
-// 		"github.com/web3sdkio/go-sdk/web3sdkio"
-// 	)
+//	import (
+//		"github.com/web3sdkio/go-sdk/v2/web3sdkio"
+//	)
 //
-// 	privateKey = "..."
+//	privateKey = "..."
 //
-// 	sdk, err := web3sdkio.NewWeb3sdkioSDK("mumbai", &web3sdkio.SDKOptions{
+//	sdk, err := web3sdkio.NewWeb3sdkioSDK("mumbai", &web3sdkio.SDKOptions{
 //		PrivateKey: privateKey,
-// 	})
+//	})
 //
 //	contract, err := sdk.GetMultiwrap("{{contract_address}}")
 type Multiwrap struct {
-	abi    *abi.Multiwrap
-	helper *contractHelper
 	*ERC721
+	abi    *abi.Multiwrap
+	Helper *contractHelper
 	Encoder *ContractEncoder
 }
 
@@ -49,9 +49,9 @@ func newMultiwrap(provider *ethclient.Client, address common.Address, privateKey
 				}
 
 				multiwrap := &Multiwrap{
+					erc721,
 					contractAbi,
 					helper,
-					erc721,
 					encoder,
 				}
 				return multiwrap, nil
@@ -68,18 +68,16 @@ func newMultiwrap(provider *ethclient.Client, address common.Address, privateKey
 //
 // Example
 //
-// 	tokenId := 0
-// 	contents, err := contract.GetWrappedContents(tokenId)
-// 	erc20Tokens := contents.Erc20Tokens
-// 	erc721Tokens := contents.Erc721Tokens
-// 	erc1155Tokens := contents.Erc1155Tokens
+//	tokenId := 0
+//	contents, err := contract.GetWrappedContents(tokenId)
+//	erc20Tokens := contents.Erc20Tokens
+//	erc721Tokens := contents.Erc721Tokens
+//	erc1155Tokens := contents.Erc1155Tokens
 func (multiwrap *Multiwrap) GetWrappedContents(wrappedTokenId int) (*MultiwrapBundle, error) {
 	wrappedTokens, err := multiwrap.abi.GetWrappedContents(&bind.CallOpts{}, big.NewInt(int64(wrappedTokenId)))
 	if err != nil {
 		return nil, err
 	}
-
-	log.Println("Tokens: ", len(wrappedTokens))
 
 	erc20Tokens := []*MultiwrapERC20{}
 	erc721Tokens := []*MultiwrapERC721{}
@@ -88,7 +86,7 @@ func (multiwrap *Multiwrap) GetWrappedContents(wrappedTokenId int) (*MultiwrapBu
 	for _, wrappedToken := range wrappedTokens {
 		switch wrappedToken.TokenType {
 		case 0:
-			tokenMetadata, err := fetchCurrencyMetadata(multiwrap.helper.GetProvider(), wrappedToken.AssetContract.String())
+			tokenMetadata, err := fetchCurrencyMetadata(context.Background(), multiwrap.Helper.GetProvider(), wrappedToken.AssetContract.String())
 			if err != nil {
 				return nil, err
 			}
@@ -132,35 +130,35 @@ func (multiwrap *Multiwrap) GetWrappedContents(wrappedTokenId int) (*MultiwrapBu
 //
 // Example
 //
-// 	contents := &web3sdkio.MultiwrapBundle{
-// 		ERC20Tokens: []*web3sdkio.MultiwrapERC20{
-// 			&web3sdkio.MultiwrapERC20{
-// 				ContractAddress: "0x...",
-// 				Quantity:        1,
-// 			},
-// 		},
-// 		ERC721Tokens: []*web3sdkio.MultiwrapERC721{
-// 			&web3sdkio.MultiwrapERC721{
-// 				ContractAddress: "0x...",
-// 				TokenId:         1,
-// 			},
-// 		},
-// 		ERC1155Tokens: []*web3sdkio.MultiwrapERC1155{
-// 			&web3sdkio.MultiwrapERC1155{
-// 				ContractAddress: "0x...",
-// 				TokenId:         1,
-// 				Quantity:        1,
-// 			},
-// 		},
-// 	}
+//	contents := &web3sdkio.MultiwrapBundle{
+//		ERC20Tokens: []*web3sdkio.MultiwrapERC20{
+//			&web3sdkio.MultiwrapERC20{
+//				ContractAddress: "0x...",
+//				Quantity:        1,
+//			},
+//		},
+//		ERC721Tokens: []*web3sdkio.MultiwrapERC721{
+//			&web3sdkio.MultiwrapERC721{
+//				ContractAddress: "0x...",
+//				TokenId:         1,
+//			},
+//		},
+//		ERC1155Tokens: []*web3sdkio.MultiwrapERC1155{
+//			&web3sdkio.MultiwrapERC1155{
+//				ContractAddress: "0x...",
+//				TokenId:         1,
+//				Quantity:        1,
+//			},
+//		},
+//	}
 //
-// 	wrappedTokenMetadata := &web3sdkio.NFTMetadataInput{
-// 		Name: "Wrapped Token"
-// 	}
+//	wrappedTokenMetadata := &web3sdkio.NFTMetadataInput{
+//		Name: "Wrapped Token"
+//	}
 //
-// 	// This will mint the wrapped token to the connected wallet
-// 	tx, err := contract.Wrap(contents, wrappedTokenMetadata, "")
-func (multiwrap *Multiwrap) Wrap(contents *MultiwrapBundle, wrappedTokenMetadata interface{}, recipientAddress string) (*types.Transaction, error) {
+//	// This will mint the wrapped token to the connected wallet
+//	tx, err := contract.Wrap(context.Background(), contents, wrappedTokenMetadata, "")
+func (multiwrap *Multiwrap) Wrap(ctx context.Context, contents *MultiwrapBundle, wrappedTokenMetadata interface{}, recipientAddress string) (*types.Transaction, error) {
 	uri, ok := wrappedTokenMetadata.(string)
 	if !ok {
 		tokenMetadata, ok := wrappedTokenMetadata.(*NFTMetadataInput)
@@ -177,15 +175,15 @@ func (multiwrap *Multiwrap) Wrap(contents *MultiwrapBundle, wrappedTokenMetadata
 	}
 
 	if recipientAddress == "" {
-		recipientAddress = multiwrap.helper.GetSignerAddress().String()
+		recipientAddress = multiwrap.Helper.GetSignerAddress().String()
 	}
 
-	tokens, err := multiwrap.toTokenStructList(contents)
+	tokens, err := multiwrap.toTokenStructList(ctx, contents)
 	if err != nil {
 		return nil, err
 	}
 
-	txOpts, err := multiwrap.helper.getTxOptions()
+	txOpts, err := multiwrap.Helper.GetTxOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +192,7 @@ func (multiwrap *Multiwrap) Wrap(contents *MultiwrapBundle, wrappedTokenMetadata
 		return nil, err
 	}
 
-	return multiwrap.helper.awaitTx(tx.Hash())
+	return multiwrap.Helper.AwaitTx(tx.Hash())
 }
 
 // Unwrap a wrapped token bundle into its contents
@@ -207,14 +205,14 @@ func (multiwrap *Multiwrap) Wrap(contents *MultiwrapBundle, wrappedTokenMetadata
 //
 // Example
 //
-// 	tokenId := 0
-// 	tx, err := contract.Unwrap(tokenId, "")
-func (multiwrap *Multiwrap) Unwrap(wrappedTokenId int, recipientAddress string) (*types.Transaction, error) {
+//	tokenId := 0
+//	tx, err := contract.Unwrap(context.Background(), tokenId, "")
+func (multiwrap *Multiwrap) Unwrap(ctx context.Context, wrappedTokenId int, recipientAddress string) (*types.Transaction, error) {
 	if recipientAddress == "" {
-		recipientAddress = multiwrap.helper.GetSignerAddress().String()
+		recipientAddress = multiwrap.Helper.GetSignerAddress().String()
 	}
 
-	txOpts, err := multiwrap.helper.getTxOptions()
+	txOpts, err := multiwrap.Helper.GetTxOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -223,16 +221,17 @@ func (multiwrap *Multiwrap) Unwrap(wrappedTokenId int, recipientAddress string) 
 		return nil, err
 	}
 
-	return multiwrap.helper.awaitTx(tx.Hash())
+	return multiwrap.Helper.AwaitTx(tx.Hash())
 }
 
-func (multiwrap *Multiwrap) toTokenStructList(contents *MultiwrapBundle) ([]abi.ITokenBundleToken, error) {
+func (multiwrap *Multiwrap) toTokenStructList(ctx context.Context, contents *MultiwrapBundle) ([]abi.ITokenBundleToken, error) {
 	tokens := []abi.ITokenBundleToken{}
-	provider := multiwrap.helper.GetProvider()
-	owner := multiwrap.helper.GetSignerAddress()
+	provider := multiwrap.Helper.GetProvider()
+	owner := multiwrap.Helper.GetSignerAddress()
 
 	for _, erc20 := range contents.ERC20Tokens {
 		normalizedQuantity, err := normalizePriceValue(
+			ctx,
 			provider,
 			erc20.Quantity,
 			erc20.ContractAddress,
@@ -242,7 +241,7 @@ func (multiwrap *Multiwrap) toTokenStructList(contents *MultiwrapBundle) ([]abi.
 		}
 
 		hasAllowance, err := hasErc20Allowance(
-			multiwrap.helper,
+			multiwrap.Helper,
 			erc20.ContractAddress,
 			normalizedQuantity,
 		)
@@ -266,8 +265,9 @@ func (multiwrap *Multiwrap) toTokenStructList(contents *MultiwrapBundle) ([]abi.
 
 	for _, erc721 := range contents.ERC721Tokens {
 		isApproved, err := isTokenApprovedForTransfer(
+			ctx,
 			provider,
-			multiwrap.helper.getAddress().String(),
+			multiwrap.Helper.getAddress().String(),
 			erc721.ContractAddress,
 			erc721.TokenId,
 			owner.String(),
@@ -280,7 +280,7 @@ func (multiwrap *Multiwrap) toTokenStructList(contents *MultiwrapBundle) ([]abi.
 			return nil, fmt.Errorf(
 				fmt.Sprintf("ERC721 with contract address %v does not have enough allowance to transfer.", erc721.ContractAddress) +
 					"You can set allowance to the multiwrap contract to transfer this token by running:\n" +
-					fmt.Sprintf("nft, _ := sdk.GetNFTCollection(\"%v\")\nnft.SetApprovalForToken(\"%v\", %d)", erc721.ContractAddress, multiwrap.helper.getAddress().String(), erc721.TokenId),
+					fmt.Sprintf("nft, _ := sdk.GetNFTCollection(\"%v\")\nnft.SetApprovalForToken(\"%v\", %d)", erc721.ContractAddress, multiwrap.Helper.getAddress().String(), erc721.TokenId),
 			)
 		}
 
@@ -295,8 +295,9 @@ func (multiwrap *Multiwrap) toTokenStructList(contents *MultiwrapBundle) ([]abi.
 
 	for _, erc1155 := range contents.ERC1155Tokens {
 		isApproved, err := isTokenApprovedForTransfer(
+			ctx,
 			provider,
-			multiwrap.helper.getAddress().String(),
+			multiwrap.Helper.getAddress().String(),
 			erc1155.ContractAddress,
 			erc1155.TokenId,
 			owner.String(),
@@ -309,7 +310,7 @@ func (multiwrap *Multiwrap) toTokenStructList(contents *MultiwrapBundle) ([]abi.
 			return nil, fmt.Errorf(
 				fmt.Sprintf("ERC1155 with contract address %v does not have enough allowance to transfer.", erc1155.ContractAddress) +
 					"You can set allowance to the multiwrap contract to transfer this token by running:\n" +
-					fmt.Sprintf("edition, _ := sdk.GetEdition(\"%v\")\nedition.SetApprovalForAll(\"%v\", true)", erc1155.ContractAddress, multiwrap.helper.getAddress().String()),
+					fmt.Sprintf("edition, _ := sdk.GetEdition(\"%v\")\nedition.SetApprovalForAll(\"%v\", true)", erc1155.ContractAddress, multiwrap.Helper.getAddress().String()),
 			)
 		}
 

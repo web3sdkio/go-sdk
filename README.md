@@ -13,7 +13,7 @@
 To install the SDK with the `go get` command, run the following:
 
 ```bash
-go get github.com/web3sdkio/go-sdk/web3sdkio
+go get github.com/web3sdkio/go-sdk/v2/web3sdkio
 ```
 
 ## Getting Started
@@ -29,8 +29,8 @@ package main
 
 import (
 	"fmt"
-  
-	"github.com/web3sdkio/go-sdk/web3sdkio"
+
+	"github.com/web3sdkio/go-sdk/v2/web3sdkio"
 )
 
 func main() {
@@ -62,7 +62,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/web3sdkio/go-sdk/web3sdkio"
+	"github.com/web3sdkio/go-sdk/v2/web3sdkio"
 )
 
 func main() {
@@ -103,7 +103,7 @@ import (
 	"fmt"
 	"encoding/json"
 
-	"github.com/web3sdkio/go-sdk/web3sdkio"
+	"github.com/web3sdkio/go-sdk/v2/web3sdkio"
 )
 
 func main() {

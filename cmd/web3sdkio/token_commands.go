@@ -1,12 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 
 	"github.com/spf13/cobra"
-	"github.com/web3sdkio/go-sdk/web3sdkio"
+	"github.com/web3sdkio/go-sdk/v2/web3sdkio"
 )
 
 var (
@@ -58,7 +59,7 @@ var tokenMintCmd = &cobra.Command{
 			panic(err)
 		}
 
-		tx, err := token.Mint(1)
+		tx, err := token.Mint(context.Background(), 1)
 		if err != nil {
 			panic(err)
 		}
@@ -77,7 +78,7 @@ var tokenMintBatchCmd = &cobra.Command{
 			panic(err)
 		}
 
-		tx, err := token.MintBatchTo([]*web3sdkio.TokenAmount{
+		tx, err := token.MintBatchTo(context.Background(), []*web3sdkio.TokenAmount{
 			{
 				ToAddress: "0x9e1b8A86fFEE4a7175DAE4bDB1cC12d111Dcb3D6",
 				Amount:    1,
