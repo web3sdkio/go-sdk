@@ -10,7 +10,6 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -239,7 +238,7 @@ func setErc20Allowance(
 
 		if allowance.Cmp(value) < 0 {
 			// We can get options from the contract instead of ERC20 because they will be the same
-			approvalOpts, err := contractToApprove.GetTxOptions(txOpts.Context)
+			approvalOpts, err := contractToApprove.getTxOptions(txOpts.Context)
 			if err != nil {
 				return err
 			}
@@ -249,7 +248,7 @@ func setErc20Allowance(
 				return err
 			}
 
-			_, err = contractToApprove.AwaitTx(tx.Hash())
+			_, err = contractToApprove.awaitTx(tx.Hash())
 			if err != nil {
 				return err
 			}
@@ -287,7 +286,7 @@ func approveErc20Allowance(
 	totalPrice := price.Mul(big.NewInt(int64(quantity)), price)
 
 	if allowance.Cmp(totalPrice) < 0 {
-		txOpts, err := erc20.GetTxOptions(ctx)
+		txOpts, err := erc20.getTxOptions(ctx)
 		if err != nil {
 			return err
 		}
@@ -296,7 +295,7 @@ func approveErc20Allowance(
 			return err
 		}
 
-		contractToApprove.AwaitTx(tx.Hash())
+		contractToApprove.awaitTx(tx.Hash())
 	}
 
 	return nil
@@ -327,13 +326,13 @@ func hasErc20Allowance(contractToApprove *contractHelper, currencyAddress string
 
 func prepareClaim(
 	ctx context.Context,
-	addressToClaim string,
 	quantity int,
 	activeClaimCondition *ClaimConditionOutput,
 	merkleMetadata *map[string]string,
 	contractHelper *contractHelper,
 	storage storage,
 ) (*ClaimVerification, error) {
+	addressToClaim := contractHelper.GetSignerAddress()
 	maxClaimable := activeClaimCondition.MaxClaimablePerWallet
 	proofs := [][32]byte{}
 	priceInProof := activeClaimCondition.Price
@@ -347,7 +346,7 @@ func prepareClaim(
 	if !strings.HasPrefix(hex.EncodeToString(activeClaimCondition.MerkleRootHash[:]), zeroAddress) {
 		snapshotEntry, err := fetchSnapshotEntryForAddress(
 			ctx,
-			common.HexToAddress(addressToClaim),
+			addressToClaim,
 			activeClaimCondition.MerkleRootHash,
 			merkleMetadata,
 			contractHelper.GetProvider(),
@@ -410,13 +409,11 @@ func prepareClaim(
 	}
 
 	claimVerification := &ClaimVerification{
-		Value:           				value,
-		Proofs:          				proofs,
-		MaxClaimable:    				maxClaimable,
-		Price:           				pricePerToken,
-		CurrencyAddress: 				currencyAddress,
-		PriceInProof:    				priceInProof,
-		CurrencyAddressInProof: currencyAddressInProof,
+		Proofs:          proofs,
+		MaxClaimable:    maxClaimable,
+		Price:           priceInProof,
+		CurrencyAddress: currencyAddressInProof,
+		Value:           value,
 	}
 
 	return claimVerification, nil
@@ -470,10 +467,8 @@ func transformResultToClaimCondition(
 		return nil, err
 	}
 
-	startTime := time.Unix(pm.StartTimestamp.Int64(), 0)
-
 	return &ClaimConditionOutput{
-		StartTime:                   startTime,
+		StartTime:                   pm.StartTimestamp,
 		MaxClaimableSupply:          pm.MaxClaimableSupply,
 		MaxClaimablePerWallet:       pm.QuantityLimitPerWallet,
 		CurrentMintSupply:           pm.SupplyClaimed,
@@ -745,7 +740,7 @@ func handleTokenApproval(
 				return err
 			}
 
-			txOpts, err := helper.GetTxOptions(ctx)
+			txOpts, err := helper.getTxOptions(ctx)
 			if err != nil {
 				return err
 			}
@@ -756,7 +751,7 @@ func handleTokenApproval(
 					return err
 				}
 
-				_, err = helper.AwaitTx(tx.Hash())
+				_, err = helper.awaitTx(tx.Hash())
 				if err != nil {
 					return err
 				}
@@ -774,7 +769,7 @@ func handleTokenApproval(
 		}
 
 		if !approved {
-			txOpts, err := helper.GetTxOptions(ctx)
+			txOpts, err := helper.getTxOptions(ctx)
 			if err != nil {
 				return err
 			}
@@ -784,7 +779,7 @@ func handleTokenApproval(
 				return err
 			}
 
-			_, err = helper.AwaitTx(tx.Hash())
+			_, err = helper.awaitTx(tx.Hash())
 			if err != nil {
 				return err
 			}

@@ -2,7 +2,6 @@ package web3sdkio
 
 import (
 	"context"
-	"encoding/hex"
 	"math/big"
 	"strings"
 
@@ -29,9 +28,9 @@ import (
 //
 //	contract, err := sdk.GetNFTDrop("{{contract_address}}")
 type NFTDrop struct {
-	*ERC721
 	Abi    *abi.DropERC721
-	Helper *contractHelper
+	helper *contractHelper
+	*ERC721
 	ClaimConditions *NFTDropClaimConditions
 	Encoder         *NFTDropEncoder
 	Events          *ContractEvents
@@ -63,9 +62,9 @@ func newNFTDrop(provider *ethclient.Client, address common.Address, privateKey s
 				}
 
 				nftCollection := &NFTDrop{
-					erc721,
 					contractAbi,
 					helper,
+					erc721,
 					claimConditions,
 					encoder,
 					events,
@@ -208,193 +207,6 @@ func (drop *NFTDrop) TotalUnclaimedSupply() (int, error) {
 	return int(unclaimed.Int64()), nil
 }
 
-func (drop *NFTDrop) GetTotalClaimed(ctx context.Context, address string) (*big.Int, error) {
-	events, err := drop.Events.GetEvents(ctx, "TokensClaimed", EventQueryOptions{
-		Filters: map[string]interface{}{
-			"receiver": common.HexToAddress(address),
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	totalClaimed := big.NewInt(0)
-	for _, event := range events {
-		totalClaimed.Add(totalClaimed, event.Data["quantityClaimed"].(*big.Int))
-	}
-
-	return totalClaimed, nil
-}
-
-func (drop *NFTDrop) GetClaimInfo(ctx context.Context, address string) (*ClaimInfo, error) {
-	claimVerification, err := drop.prepareClaim(ctx, address, 0, false)
-	if err != nil {
-		return nil, err
-	}
-
-	active, err := drop.ClaimConditions.GetActive()
-	if err != nil {
-		return nil, err
-	}
-
-	activeConditionIndex, err := drop.Abi.GetActiveClaimConditionId(&bind.CallOpts{})
-	if err != nil {
-		return nil, err
-	}
-
-	totalClaimedInPhase, err := drop.Abi.GetSupplyClaimedByWallet(&bind.CallOpts{}, activeConditionIndex, common.HexToAddress(address))
-	if err != nil {
-		return nil, err
-	}
-
-	remainingClaimable := big.NewInt(0).Sub(claimVerification.MaxClaimable, totalClaimedInPhase)
-	if remainingClaimable.Cmp(big.NewInt(0)) < 0 {
-		remainingClaimable = big.NewInt(0)
-	}
-	if active.AvailableSupply.Cmp(remainingClaimable) < 0 {
-		remainingClaimable = active.AvailableSupply
-	}
-
-	return &ClaimInfo{
-		PricePerToken: claimVerification.Price,
-		RemainingClaimable: remainingClaimable,
-		CurrencyAddress: common.HexToAddress(claimVerification.CurrencyAddress),
-	}, nil
-}
-
-func (drop *NFTDrop) GetClaimIneligibilityReasons(ctx context.Context, quantity int, addressToCheck string) ([]ClaimEligibility, error) {
-	reasons := []ClaimEligibility{}
-
-	active, err := drop.ClaimConditions.GetActive()
-	if err != nil {
-		if strings.Contains(err.Error(), "!CONDITION") || strings.Contains(err.Error(), "no active mint condition") {
-			reasons = append(reasons, NoClaimConditionSet)
-			return reasons, nil
-		} 
-		
-		return reasons, err
-	}
-
-	activeConditionIndex, err := drop.Abi.GetActiveClaimConditionId(&bind.CallOpts{})
-	if err != nil {
-		return nil, err
-	}
-	totalClaimedInPhase, err := drop.Abi.GetSupplyClaimedByWallet(&bind.CallOpts{}, activeConditionIndex, common.HexToAddress(addressToCheck))
-	if err != nil {
-		return nil, err
-	}
-
-	MaxUint256 := new(big.Int).Sub(new(big.Int).Lsh(common.Big1, 256), common.Big1)
-	if active.AvailableSupply.Cmp(MaxUint256) != 0 {
-		if active.AvailableSupply.Cmp(big.NewInt(int64(quantity))) < 0 {
-			reasons = append(reasons, NotEnoughSupply)
-			return reasons, nil
-		}
-	}
-
-	hasAllowlistEntry := !strings.HasPrefix(hex.EncodeToString(active.MerkleRootHash[:]), zeroAddress)
-	var allowlistEntry *SnapshotEntryWithProof
-	if hasAllowlistEntry {
-		allowlistEntry, err = drop.ClaimConditions.GetClaimerProofs(ctx, addressToCheck)
-		if err != nil {
-			return reasons, err
-		}
-
-		if allowlistEntry != nil {
-			claimVerification, err := drop.prepareClaim(
-				ctx,
-				addressToCheck,
-				quantity,
-				false,
-			)
-			if err != nil {
-				return reasons, err
-			}
-	
-			if (
-				(active.MaxClaimablePerWallet.Cmp(big.NewInt(0)) == 0 && 
-				claimVerification.MaxClaimable.Cmp(MaxUint256) == 0) || 
-				claimVerification.MaxClaimable.Cmp(big.NewInt(0)) == 0) {
-				reasons = append(reasons, AddressNotAllowed)
-				return reasons, nil
-			} else if totalClaimedInPhase.Add(totalClaimedInPhase, big.NewInt(int64(quantity))).Cmp(claimVerification.MaxClaimable) > 0 {
-				reasons = append(reasons, ExceedsMaxClaimable)
-				return reasons, nil
-			}
-	
-			activeConditionIndex, err := drop.Abi.GetActiveClaimConditionId(&bind.CallOpts{})
-			if err != nil {
-				return reasons, err
-			}
-	
-			proof := abi.IDropAllowlistProof{
-				Proof: claimVerification.Proofs,
-				QuantityLimitPerWallet: claimVerification.MaxClaimable,
-				PricePerToken: claimVerification.PriceInProof,
-				Currency: common.HexToAddress(claimVerification.CurrencyAddressInProof),
-			}
-	
-			isValid, err := drop.Abi.VerifyClaim(
-				&bind.CallOpts{},
-				activeConditionIndex,
-				common.HexToAddress(addressToCheck),
-				big.NewInt(int64(quantity)),
-				common.HexToAddress(claimVerification.CurrencyAddress),
-				claimVerification.Price,
-				proof,
-			)
-	
-			if err != nil || !isValid {
-				reasons = append(reasons, AddressNotAllowed)
-				return reasons, nil
-			}
-		}
-	}
-
-	if !hasAllowlistEntry || allowlistEntry == nil {
-		if active.MaxClaimablePerWallet.Cmp(big.NewInt(0)) == 0 {
-			reasons = append(reasons, AddressNotAllowed)
-			return reasons, nil
-		} else {
-			if totalClaimedInPhase.Add(totalClaimedInPhase, big.NewInt(int64(quantity))).Cmp(active.MaxClaimablePerWallet) > 0 {
-				reasons = append(reasons, ExceedsMaxClaimable)
-				return reasons, nil
-			}
-		}
-	}
-
-	totalPrice := active.Price.Mul(active.Price, big.NewInt(int64(quantity)))
-	if isNativeToken(active.CurrencyAddress) {
-		balance, err := drop.Helper.GetProvider().BalanceAt(ctx, common.HexToAddress(addressToCheck), nil)
-		if err != nil {
-			return reasons, err
-		}
-
-		if balance.Cmp(totalPrice) < 0 {
-			reasons = append(reasons, InsufficientBalance)
-			return reasons, nil
-		}
-	} else {
-		provider := drop.Helper.GetProvider()
-		erc20, err := abi.NewIERC20(common.HexToAddress(active.CurrencyAddress), provider)
-		if err != nil {
-			return reasons, err
-		}
-
-		balance, err := erc20.BalanceOf(&bind.CallOpts{}, common.HexToAddress(addressToCheck))
-		if err != nil {
-			return reasons, err
-		}
-
-		if balance.Cmp(totalPrice) < 0 {
-			reasons = append(reasons, InsufficientBalance)
-			return reasons, nil
-		}
-	}
-	
-	return reasons, nil
-}
-
 // Create a batch of NFTs on this contract.
 //
 // metadatas: a list of the metadatas of the NFTs to create
@@ -430,8 +242,8 @@ func (drop *NFTDrop) CreateBatch(ctx context.Context, metadatas []*NFTMetadataIn
 	}
 	fileStartNumber := int(startNumber.Int64())
 
-	contractAddress := drop.Helper.getAddress().String()
-	signerAddress := drop.Helper.GetSignerAddress().String()
+	contractAddress := drop.helper.getAddress().String()
+	signerAddress := drop.helper.GetSignerAddress().String()
 
 	data := []interface{}{}
 	for _, metadata := range metadatas {
@@ -448,7 +260,7 @@ func (drop *NFTDrop) CreateBatch(ctx context.Context, metadatas []*NFTMetadataIn
 		signerAddress,
 	)
 
-	txOpts, err := drop.Helper.GetTxOptions(ctx)
+	txOpts, err := drop.helper.getTxOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -462,7 +274,7 @@ func (drop *NFTDrop) CreateBatch(ctx context.Context, metadatas []*NFTMetadataIn
 		return nil, err
 	}
 
-	return drop.Helper.AwaitTx(tx.Hash())
+	return drop.helper.awaitTx(tx.Hash())
 }
 
 // Claim NFTs from this contract to the connect wallet.
@@ -471,7 +283,7 @@ func (drop *NFTDrop) CreateBatch(ctx context.Context, metadatas []*NFTMetadataIn
 //
 // returns: the transaction receipt of the claim
 func (drop *NFTDrop) Claim(ctx context.Context, quantity int) (*types.Transaction, error) {
-	address := drop.Helper.GetSignerAddress().String()
+	address := drop.helper.GetSignerAddress().String()
 	return drop.ClaimTo(ctx, address, quantity)
 }
 
@@ -489,13 +301,18 @@ func (drop *NFTDrop) Claim(ctx context.Context, quantity int) (*types.Transactio
 //	quantity = 1
 //
 //	tx, err := contract.ClaimTo(context.Background(), address, quantity)
-func (drop *NFTDrop) ClaimTo(ctx context.Context, destinationAddress string, quantity int) (*types.Transaction, error) {	
-	claimVerification, err := drop.prepareClaim(ctx, destinationAddress, quantity, true)
+func (drop *NFTDrop) ClaimTo(ctx context.Context, destinationAddress string, quantity int) (*types.Transaction, error) {
+	active, err := drop.ClaimConditions.GetActive()
+	if err != nil {
+		return nil, err
+	}
+	
+	claimVerification, err := drop.prepareClaim(ctx, quantity, true)
 	if err != nil {
 		return nil, err
 	}
 
-	txOpts, err := drop.Helper.GetTxOptions(ctx)
+	txOpts, err := drop.helper.getTxOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -505,16 +322,16 @@ func (drop *NFTDrop) ClaimTo(ctx context.Context, destinationAddress string, qua
 	proof := abi.IDropAllowlistProof{
 		Proof: claimVerification.Proofs,
 		QuantityLimitPerWallet: claimVerification.MaxClaimable,
-		PricePerToken: claimVerification.PriceInProof,
-		Currency: common.HexToAddress(claimVerification.CurrencyAddressInProof),
+		PricePerToken: claimVerification.Price,
+		Currency: common.HexToAddress(claimVerification.CurrencyAddress),
 	}
 
 	tx, err := drop.Abi.Claim(
 		txOpts,
 		common.HexToAddress(destinationAddress),
 		big.NewInt(int64(quantity)),
-		common.HexToAddress(claimVerification.CurrencyAddress),
-		claimVerification.Price,
+		common.HexToAddress(active.CurrencyAddress),
+		active.Price,
 		proof,
 		[]byte{},
 	)
@@ -522,7 +339,7 @@ func (drop *NFTDrop) ClaimTo(ctx context.Context, destinationAddress string, qua
 		return nil, err
 	}
 
-	return drop.Helper.AwaitTx(tx.Hash())
+	return drop.helper.awaitTx(tx.Hash())
 }
 
 func (drop *NFTDrop) GetClaimArguments(
@@ -533,53 +350,65 @@ func (drop *NFTDrop) GetClaimArguments(
 	*ClaimArguments,
 	error,
 ) {
-	claimVerification, err := drop.prepareClaim(ctx, destinationAddress, quantity, false)
+	active, err := drop.ClaimConditions.GetActive()
+	if err != nil {
+		return nil, err
+	}
+	
+	claimVerification, err := drop.prepareClaim(ctx, quantity, false)
 	if err != nil {
 		return nil, err
 	}
 
+	txOpts, err := drop.helper.getTxOptions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	txOpts.Value = claimVerification.Value
+
 	proof := abi.IDropAllowlistProof{
 		Proof: claimVerification.Proofs,
 		QuantityLimitPerWallet: claimVerification.MaxClaimable,
-		PricePerToken: claimVerification.PriceInProof,
-		Currency: common.HexToAddress(claimVerification.CurrencyAddressInProof),
+		PricePerToken: claimVerification.Price,
+		Currency: common.HexToAddress(claimVerification.CurrencyAddress),
 	}
 
 	return &ClaimArguments{ 
-		claimVerification.Value, 
+		txOpts, 
 		common.HexToAddress(destinationAddress), 
 		big.NewInt(int64(quantity)),  
-		common.HexToAddress(claimVerification.CurrencyAddress), 
-		claimVerification.Price, 
+		common.HexToAddress(active.CurrencyAddress), 
+		active.Price, 
 		proof, 
 		[]byte{}, 
 	}, nil
 }
 
-func (drop *NFTDrop) prepareClaim(ctx context.Context, addressToClaim string, quantity int, handleApproval bool) (*ClaimVerification, error) {
+func (drop *NFTDrop) prepareClaim(ctx context.Context, quantity int, handleApproval bool) (*ClaimVerification, error) {
 	active, err := drop.ClaimConditions.GetActive()
 	if err != nil {
 		return nil, err
 	}
 
-	merkleMetadata, err := drop.ClaimConditions.getMerkleMetadata()
+	merkleMetadata, err := drop.ClaimConditions.GetMerkleMetadata()
 	if err != nil {
 		return nil, err
 	}
 
 	claimVerification, err := prepareClaim(
 		ctx,
-		addressToClaim,
 		quantity,
 		active,
 		merkleMetadata,
-		drop.Helper,
+		drop.helper,
 		drop.storage,
 	)
 	if err != nil {
 		return nil, err
 	}
 
+	
 	// Handle approval for ERC20
 	if handleApproval {
 		MaxUint256 := new(big.Int).Sub(new(big.Int).Lsh(common.Big1, 256), common.Big1)
@@ -602,7 +431,7 @@ func (drop *NFTDrop) prepareClaim(ctx context.Context, addressToClaim string, qu
 			if !isNativeToken(currencyAddress) {
 				err := approveErc20Allowance(
 					ctx,
-					drop.Helper,
+					drop.helper,
 					currencyAddress,
 					pricePerToken,
 					quantity,

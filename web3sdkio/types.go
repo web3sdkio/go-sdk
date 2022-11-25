@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/web3sdkio/go-sdk/v2/abi"
 )
@@ -70,12 +71,10 @@ type ClaimVerification struct {
 	MaxClaimable              *big.Int
 	Price                     *big.Int
 	CurrencyAddress           string
-	PriceInProof              *big.Int
-	CurrencyAddressInProof    string
 }
 
 type ClaimConditionOutput struct {
-	StartTime                   time.Time
+	StartTime                   *big.Int
 	MaxClaimableSupply 					*big.Int
 	MaxClaimablePerWallet 		  *big.Int
 	CurrentMintSupply           *big.Int
@@ -84,6 +83,7 @@ type ClaimConditionOutput struct {
 	Price                       *big.Int
 	CurrencyAddress             string
 	CurrencyMetadata            *CurrencyValue
+	MaxQuantity                 *big.Int
 	MerkleRootHash              [32]byte
 }
 type Currency struct {
@@ -522,19 +522,13 @@ type MarketplaceFilter struct {
 // CLAIM CONDITIONS
 
 type ClaimArguments struct {
-	TxValue        *big.Int
+	Opts           *bind.TransactOpts
 	Receiver       common.Address
 	Quantity       *big.Int
 	Currency       common.Address
 	PricePerToken  *big.Int
 	AllowlistProof abi.IDropAllowlistProof
 	Data 					 []byte
-}
-
-type ClaimInfo struct {
-	PricePerToken      *big.Int
-	CurrencyAddress    common.Address
-	RemainingClaimable *big.Int
 }
 
 type ClaimConditionInput struct {

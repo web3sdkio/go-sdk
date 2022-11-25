@@ -60,7 +60,7 @@ func (claim *NFTDropClaimConditions) GetActive() (*ClaimConditionOutput, error) 
 		return nil, err
 	}
 
-  merkle, err := claim.getMerkleMetadata()
+  merkle, err := claim.GetMerkleMetadata()
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (claim *NFTDropClaimConditions) Get(claimConditionId int) (*ClaimConditionO
 	}
 
 	provider := claim.helper.GetProvider()
-	merkle, err := claim.getMerkleMetadata()
+	merkle, err := claim.GetMerkleMetadata()
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (claim *NFTDropClaimConditions) GetAll() ([]*ClaimConditionOutput, error) {
 			return nil, err
 		}
 
-		merkle, err := claim.getMerkleMetadata()
+		merkle, err := claim.GetMerkleMetadata()
 		if err != nil {
 			return nil, err
 		}
@@ -161,7 +161,7 @@ func (claim *NFTDropClaimConditions) GetAll() ([]*ClaimConditionOutput, error) {
 	return conditions, nil
 }
 
-func (claim *NFTDropClaimConditions) getMerkleMetadata() (*map[string]string, error) {
+func (claim *NFTDropClaimConditions) GetMerkleMetadata() (*map[string]string, error) {
 	uri, err := claim.abi.InternalContractURI(&bind.CallOpts{});
 	if err != nil {
 		return nil, err
@@ -185,14 +185,15 @@ func (claim *NFTDropClaimConditions) getMerkleMetadata() (*map[string]string, er
 func (claim *NFTDropClaimConditions) GetClaimerProofs(
 	ctx context.Context,
 	claimerAddress string,
+  claimConditionId int,
 ) (*SnapshotEntryWithProof, error) {
-	claimCondition, err := claim.GetActive()
+	claimCondition, err := claim.Get(claimConditionId)
 	if err != nil {
 		return nil, err
 	}
 	
 	if !strings.HasPrefix(hex.EncodeToString(claimCondition.MerkleRootHash[:]), zeroAddress) {
-		merkleMetadata, err := claim.getMerkleMetadata()
+		merkleMetadata, err := claim.GetMerkleMetadata()
 		if err != nil {
 			return nil, err
 		}

@@ -90,7 +90,7 @@ var nftDropGetActiveCmd = &cobra.Command{
 
 		fmt.Println("Start Time:", active.StartTime)
 		fmt.Println("Available:", active.AvailableSupply)
-		fmt.Println("Quantity:", active.MaxClaimableSupply)
+		fmt.Println("Quantity:", active.MaxQuantity)
 		fmt.Println("Quantity Limit:", active.MaxClaimablePerWallet)
 		fmt.Println("Price:", active.Price)
 		fmt.Println("Wait In Seconds", active.WaitInSeconds)
@@ -104,7 +104,7 @@ var nftDropGetActiveCmd = &cobra.Command{
 			fmt.Printf(fmt.Sprintf("\n\nClaim Condition %d\n================\n", i))
 			fmt.Println("Start Time:", c.StartTime)
 			fmt.Println("Available:", c.AvailableSupply)
-			fmt.Println("Quantity:", c.MaxClaimableSupply)
+			fmt.Println("Quantity:", c.MaxQuantity)
 			fmt.Println("Quantity Limit:", c.MaxClaimablePerWallet)
 			fmt.Println("Price:", c.Price)
 			fmt.Println("Wait In Seconds", c.WaitInSeconds)
@@ -121,33 +121,16 @@ var nftDropClaimCmd = &cobra.Command{
 			panic(err)
 		}
 
-		emptySdk, err := web3sdkio.NewWeb3sdkioSDK(
-			chainRpcUrl,
-			nil,
-		)
-		if err != nil {
-			panic(err)
-		}
-
-		emptyDrop, err := emptySdk.GetNFTDrop(nftDropContractAddress)
-
 		address := web3sdkioSDK.GetSignerAddress().String()
-		claimArgs, err := emptyDrop.GetClaimArguments(context.Background(), address, 1)	
+		claimArgs, err := nftDrop.GetClaimArguments(context.Background(), address, 1)	
 		if err != nil {
 			panic(err)
 		}
 
 		fmt.Printf("%#v\n", claimArgs)
 
-		txOpts, err := nftDrop.Helper.GetTxOptions(context.Background())
-		if err != nil {
-			panic(err)
-		}
-
-		txOpts.Value = claimArgs.TxValue
-
 		tx, err := nftDrop.Abi.Claim(
-			txOpts,
+			claimArgs.Opts,
 			claimArgs.Receiver,
 			claimArgs.Quantity,
 			claimArgs.Currency,
@@ -160,13 +143,6 @@ var nftDropClaimCmd = &cobra.Command{
 		}
 
 		awaitTx(tx.Hash())
-
-		unclaimed, err := nftDrop.TotalUnclaimedSupply()
-		if err != nil {
-			panic(err)
-		}
-
-		fmt.Println(unclaimed)
 
 		// tx, err := nftDrop.Claim(context.Background(), 1)
 		// if err != nil {

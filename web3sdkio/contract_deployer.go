@@ -253,7 +253,7 @@ func (deployer *ContractDeployer) deployContract(ctx context.Context, contractTy
 
 	encodedFunc, err := contractAbi.Pack("initialize", deployArguments...)
 
-	opts, err := deployer.helper.GetTxOptions(ctx)
+	opts, err := deployer.helper.getTxOptions(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -263,7 +263,7 @@ func (deployer *ContractDeployer) deployContract(ctx context.Context, contractTy
 		return "", err
 	}
 
-	receipt, err := deployer.helper.AwaitTx(tx.Hash())
+	receipt, err := deployer.helper.awaitTx(tx.Hash())
 	if err != nil {
 		return "", err
 	}

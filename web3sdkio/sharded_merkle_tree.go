@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"strings"
 
@@ -125,8 +124,7 @@ func (tree *ShardedMerkleTree) GetProof(
 		uri := tree.baseUri + `/` + shardId + `.json`
 		raw, err := tree.storage.Get(uri)
 		if err != nil {
-			fmt.Println("[warning] specified address is not in merkle tree")
-			return nil, nil
+			return nil, err
 		}
 		
 		err = json.Unmarshal(raw, &shardData)
@@ -185,8 +183,6 @@ func (tree *ShardedMerkleTree) GetProof(
 			config := &merkletree.Config{
 				Mode: merkletree.ModeProofGenAndTreeBuild,
 				HashFunc: calculateHash,
-				SortLeaves: true,
-				SortPairs: true,
 			}
 	
 			merkleTree, err := merkletree.New(config, hashedEntries)
